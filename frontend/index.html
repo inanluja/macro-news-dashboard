@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Macro News Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --critical: #ff4444;
+    --high: #f78166;
+    --medium: #e3b341;
+    --low: #3fb950;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); flex: 1; }
+  #status { font-size: 12px; color: var(--muted); }
+  #status.live { color: var(--low); }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .controls input, .controls select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+  .controls input:focus, .controls select:focus { outline: 2px solid var(--accent); }
+  .btn { background: var(--accent); color: #000; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .btn:hover { opacity: 0.85; }
+  .btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); font-weight: 400; }
+
+  .stats-bar { display: flex; gap: 12px; padding: 8px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+  .stat-chip { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .stat-chip.Critical { background: #2d0a0a; color: var(--critical); border: 1px solid var(--critical); }
+  .stat-chip.High { background: #2d1a0a; color: var(--high); border: 1px solid var(--high); }
+  .stat-chip.Medium { background: #2d2400; color: var(--medium); border: 1px solid var(--medium); }
+  .stat-chip.Low { background: #0a2d12; color: var(--low); border: 1px solid var(--low); }
+  .stat-chip.active { opacity: 1; } .stat-chip:not(.active) { opacity: 0.55; }
+
+  #feed { padding: 16px 20px; display: grid; gap: 10px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; border-left: 4px solid var(--border); transition: border-color 0.15s; }
+  .card:hover { border-color: var(--accent); }
+  .card.Critical { border-left-color: var(--critical); }
+  .card.High { border-left-color: var(--high); }
+  .card.Medium { border-left-color: var(--medium); }
+  .card.Low { border-left-color: var(--low); }
+
+  .card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+  .card-title { font-weight: 600; font-size: 14px; line-height: 1.4; flex: 1; }
+  .card-title a { color: var(--text); text-decoration: none; }
+  .card-title a:hover { color: var(--accent); }
+  .impact-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  .impact-badge.Critical { background: var(--critical); color: #fff; }
+  .impact-badge.High { background: var(--high); color: #000; }
+  .impact-badge.Medium { background: var(--medium); color: #000; }
+  .impact-badge.Low { background: var(--low); color: #000; }
+
+  .card-summary { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+  .card-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .source-label { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .time-label { font-size: 11px; color: var(--muted); }
+  .tag { font-size: 11px; background: #21262d; color: var(--muted); padding: 2px 7px; border-radius: 4px; }
+
+  #empty { text-align: center; color: var(--muted); padding: 60px 20px; display: none; }
+  #loading { text-align: center; color: var(--muted); padding: 60px 20px; }
+
+  .notify-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .notify-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📡 Macro News Dashboard</h1>
+  <span id="status">Connecting...</span>
+  <button class="notify-btn" id="notifyBtn" onclick="requestNotify()">🔔 Enable Alerts</button>
+</header>
+
+<div class="controls">
+  <input id="search" type="text" placeholder="Search..." oninput="applyFilters()" style="width:200px" />
+  <select id="catFilter" onchange="applyFilters()">
+    <option value="">All Categories</option>
+    <option>Central Bank</option>
+    <option>Markets</option>
+    <option>Economy</option>
+    <option>World News</option>
+    <option>Geopolitical</option>
+    <option>Commodities</option>
+  </select>
+  <select id="tagFilter" onchange="applyFilters()">
+    <option value="">All Tags</option>
+  </select>
+  <button class="btn secondary" onclick="clearFilters()">Clear</button>
+  <button class="btn" onclick="fetchNow()">↻ Refresh</button>
+  <span style="margin-left:auto;color:var(--muted);font-size:12px" id="countLabel"></span>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+<div id="loading">Fetching news from sources... (first load may take 20–30 seconds)</div>
+<div id="feed"></div>
+<div id="empty">No articles match your filters.</div>
+
+<script>
+const API = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:8000"
+  : "https://macro-news-backend.onrender.com";
+let allArticles = [];
+let activeImpact = null;
+let notifyEnabled = false;
+let knownIds = new Set();
+
+async function fetchNow() {
+  try {
+    const params = new URLSearchParams({ limit: 500 });
+    const res = await fetch(`${API}/api/news?${params}`);
+    const data = await res.json();
+
+    // Detect new critical/high articles for notifications
+    const fresh = data.articles.filter(a => !knownIds.has(a.id));
+    fresh.forEach(a => {
+      knownIds.add(a.id);
+      if (notifyEnabled && (a.impact === "Critical" || a.impact === "High")) {
+        new Notification(`[${a.impact}] ${a.source}`, { body: a.title, icon: "" });
+      }
+    });
+
+    allArticles = data.articles;
+    document.getElementById("loading").style.display = "none";
+    updateStats(data);
+    applyFilters();
+  } catch (e) {
+    document.getElementById("status").textContent = "⚠ Cannot connect to backend";
+  }
+}
+
+async function fetchStats() {
+  try {
+    const res = await fetch(`${API}/api/stats`);
+    const data = await res.json();
+    updateStatsBar(data);
+  } catch (_) {}
+}
+
+function updateStats(data) {
+  const el = document.getElementById("status");
+  if (data.last_updated) {
+    const d = new Date(data.last_updated);
+    el.textContent = `Last updated: ${d.toLocaleTimeString()}`;
+    el.className = "live";
+  }
+  updateStatsBar({ by_impact: countImpacts(data.articles) });
+  updateTagFilter(data.articles);
+}
+
+function countImpacts(articles) {
+  const c = {};
+  articles.forEach(a => c[a.impact] = (c[a.impact] || 0) + 1);
+  return c;
+}
+
+function updateStatsBar(data) {
+  const bar = document.getElementById("statsBar");
+  const order = ["Critical", "High", "Medium", "Low"];
+  bar.innerHTML = order.map(imp => {
+    const n = (data.by_impact || {})[imp] || 0;
+    const active = activeImpact === imp ? "active" : "";
+    return `<span class="stat-chip ${imp} ${active}" onclick="toggleImpact('${imp}')">${imp}: ${n}</span>`;
+  }).join("");
+}
+
+function updateTagFilter(articles) {
+  const tags = new Set();
+  articles.forEach(a => a.tags.forEach(t => tags.add(t)));
+  const sel = document.getElementById("tagFilter");
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">All Tags</option>` +
+    [...tags].sort().map(t => `<option${t === cur ? " selected" : ""}>${t}</option>`).join("");
+}
+
+function toggleImpact(imp) {
+  activeImpact = activeImpact === imp ? null : imp;
+  applyFilters();
+  updateStatsBar({ by_impact: countImpacts(allArticles) });
+}
+
+function applyFilters() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const cat = document.getElementById("catFilter").value;
+  const tag = document.getElementById("tagFilter").value;
+
+  let filtered = allArticles.filter(a => {
+    if (activeImpact && a.impact !== activeImpact) return false;
+    if (cat && a.category !== cat) return false;
+    if (tag && !a.tags.includes(tag)) return false;
+    if (search && !a.title.toLowerCase().includes(search) && !a.summary.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  document.getElementById("countLabel").textContent = `${filtered.length} articles`;
+  renderFeed(filtered);
+}
+
+function clearFilters() {
+  document.getElementById("search").value = "";
+  document.getElementById("catFilter").value = "";
+  document.getElementById("tagFilter").value = "";
+  activeImpact = null;
+  applyFilters();
+  updateStatsBar({ by_impact: countImpacts(allArticles) });
+}
+
+function renderFeed(articles) {
+  const feed = document.getElementById("feed");
+  const empty = document.getElementById("empty");
+
+  if (articles.length === 0) {
+    feed.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  feed.innerHTML = articles.map(a => {
+    const time = timeAgo(a.published);
+    const tags = a.tags.map(t => `<span class="tag">${t}</span>`).join(" ");
+    return `
+    <div class="card ${a.impact}">
+      <div class="card-header">
+        <div class="card-title"><a href="${a.link}" target="_blank" rel="noopener">${escHtml(a.title)}</a></div>
+        <span class="impact-badge ${a.impact}">${a.impact}</span>
+      </div>
+      ${a.summary ? `<div class="card-summary">${escHtml(a.summary)}</div>` : ""}
+      <div class="card-meta">
+        <span class="source-label">${escHtml(a.source)}</span>
+        <span class="time-label">${time}</span>
+        ${tags}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function timeAgo(iso) {
+  const diff = (Date.now() - new Date(iso)) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function requestNotify() {
+  if (!("Notification" in window)) return alert("Notifications not supported.");
+  Notification.requestPermission().then(p => {
+    notifyEnabled = p === "granted";
+    document.getElementById("notifyBtn").textContent = notifyEnabled ? "🔔 Alerts ON" : "🔕 Alerts OFF";
+  });
+}
+
+// Poll every 3 minutes
+fetchNow();
+setInterval(fetchNow, 180_000);
+</script>
+</body>
+</html>
